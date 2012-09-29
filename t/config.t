@@ -52,6 +52,7 @@ is_deeply $c->get('f.g.h'), { i => 4 };
 
 # Parse error
 {
+    local $@;
     eval {
         Config::Hash->new( filename => "$Bin/bin/test_bad.conf" );
     };
@@ -60,6 +61,7 @@ is_deeply $c->get('f.g.h'), { i => 4 };
 
 # Parse error
 {
+    local $@;
     eval {
         Config::Hash->new( filename => "$Bin/bin/test_bad2.conf" );
     };
@@ -68,6 +70,7 @@ is_deeply $c->get('f.g.h'), { i => 4 };
 
 # Using $self error
 {
+    local $@;
     eval {
         Config::Hash->new( filename => "$Bin/bin/test_bad3.conf" );
     };
