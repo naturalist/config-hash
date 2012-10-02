@@ -8,7 +8,7 @@ use Carp;
 use File::Basename;
 use Hash::Merge;
 
-our $VERSION = '0.91';
+our $VERSION = '0.912';
 
 sub new {
     my ( $class, %args ) = @_;
