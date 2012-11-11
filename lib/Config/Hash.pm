@@ -4,11 +4,10 @@ use strict;
 use warnings;
 use v5.06;
 
-use Carp;
 use File::Basename;
 use Hash::Merge;
 
-our $VERSION = '0.912';
+our $VERSION = '0.913';
 
 sub new {
     my ( $class, %args ) = @_;
@@ -52,7 +51,8 @@ sub new {
 
 sub _eval {
     my $p = shift;
-    eval shift;
+    local $@;
+    return (eval shift, $@);
 }
 
 sub load {
@@ -68,14 +68,11 @@ sub load {
     my $text = do { local $/ = undef; <$in> };
     close($in);
 
-    my $hash = {};
-    {
-        local $@;
-        $hash = _eval($self->param, $text);
-        die "Config file $filename parse error: " . $@ if $@;
-        die "Config file $filename did not return a HASH"
-          unless ref $hash eq 'HASH';
-    }
+    my ( $hash, $error ) = _eval( $self->param, $text );
+    die "Config file $filename parse error: " . $error if $error;
+    die "Config file $filename did not return a HASH"
+      unless ref $hash eq 'HASH';
+
     return $hash;
 }
 

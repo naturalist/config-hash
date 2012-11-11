@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Test::More;
+use Test::More tests => 27;
 use Test::Deep;
 use Test::Exception;
 use Config::Hash;
@@ -101,4 +101,3 @@ dies_ok { Config::Hash->new( filename => "$Bin/bin/test_bad3.conf" ) }
 $SIG{__WARN__} = sub {};
 is_deeply $c->load('missing'), {};
 
-done_testing;
