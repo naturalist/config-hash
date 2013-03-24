@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 27;
+use Test::More tests => 29;
 use Test::Deep;
 use Test::Exception;
 use Config::Hash;
@@ -29,6 +29,8 @@ is $c->get('a'),       1;
 is $c->get('d.e'),     3;
 is $c->get('f.g.h.i'), 4;
 is_deeply $c->get('f.g.h'), { i => 4 };
+is $c->get(''), undef;
+is $c->get(), undef;
 
 # Get breaks
 dies_ok { $c->get('b.c') } "Path breaks";

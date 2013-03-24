@@ -78,6 +78,7 @@ sub load {
 
 sub get {
     my ( $self, $path ) = @_;
+    return unless $path;
     my @a = split( $self->{separator}, $path );
     my $val = $self->{data};
     for my $chunk (@a) {
@@ -247,7 +248,7 @@ Get a value from the config hash.
 
     my $value = $c->get('bar.foo.baz');
     my $same  = $c->get('bar')->{foo}->{baz};
-    my $again = $c->hash->{bar}->{foo}->{baz};
+    my $again = $c->data->{bar}->{foo}->{baz};
 
 By default the subhash separator is a dot, but this can be changed via the
 L</separator> attribute.
