@@ -5,9 +5,8 @@ use warnings;
 use v5.06;
 
 use File::Basename;
-use Hash::Merge;
 
-our $VERSION = '0.913';
+our $VERSION = '0.920';
 
 sub new {
     my ( $class, %args ) = @_;
@@ -19,14 +18,19 @@ sub new {
 
     my $self = bless \%args, $class;
 
+    no strict 'refs';
+    if ( !*{"${class}::AUTOLOAD"}{CODE} ) {
+        *{"${class}::AUTOLOAD"} = sub {
+            our $AUTOLOAD;
+            my $sub = $AUTOLOAD =~ /::(\w+)$/ ? $1 : return;
+            return $self->{param}->{$sub};
+        };
+    }
+
     if ( defined $self->{filename} ) {
 
-        Hash::Merge::set_behavior('RIGHT_PRECEDENT');
-
         # Load the main config file
-        my $data =
-          Hash::Merge::merge( $self->{data},
-            $self->load( $self->{filename} ) );
+        my $data = merge( $self->{data}, $self->load( $self->{filename} ) );
 
         # Break up the path in chunks
         my ( $name, $dir, $ext ) = fileparse( $self->{filename}, qr/\.[^.]*/ );
@@ -37,8 +41,7 @@ sub new {
             for my $m (@modes) {
                 my $filename = sprintf( "%s%s_%s%s", $dir, $name, $m, $ext );
                 if ( -e $filename ) {
-                    $data =
-                      Hash::Merge::merge( $data, $self->load($filename) );
+                    $data = merge( $data, $self->load($filename) );
                 }
             }
         }
@@ -50,9 +53,9 @@ sub new {
 }
 
 sub _eval {
-    my $p = shift;
+    my ( $param, $text ) = @_;
     local $@;
-    return (eval shift, $@);
+    return (eval $text, $@);
 }
 
 sub load {
@@ -92,7 +95,24 @@ sub get {
     return $val;
 }
 
-sub param { $_[0]->{param} }
+sub merge {
+    my ( $a, $b ) = @_;
+    return $b
+      if !ref($a)
+      || !ref($b)
+      || ref($a) ne ref($b)
+      || ref($a) ne 'HASH';
+
+    for my $k ( keys %$b ) {
+        $a->{$k} =
+          exists $a->{$k}
+          ? merge( $a->{$k}, $b->{$k} )
+          : $b->{$k};
+    }
+
+    return $a;
+}
+
 sub data  { $_[0]->{data} }
 
 1;
@@ -154,6 +174,46 @@ precedent given to the config file.
 
 Simple yet powerful config module. Why simple? Because it uses Perl hashes.
 Why powerful? Because it uses Perl hashes.
+
+=head1 MERGING
+
+Config::Hash merges two hashes so that the second hash overrides the first
+one. Let's say we have two hashes, A and B. Merging will proceed as follows:
+
+=over
+
+=item
+
+Each key in B that doesn't contain a hash will be copied to A. Duplicate
+keys will be overwriten in favor of B.
+
+=cut
+
+=item
+
+Each key in B that contains a hash will be merged using the same algorithm
+described here.
+
+=cut
+
+=back
+
+Example:
+
+    # Example 1
+    $a      = { a => 1, b => 2 };
+    $b      = { a => 3 };
+    $merged = { a => 2, b => 2 };
+
+    # Example 2
+    $a      = { a => { b => 'foo' } };
+    $b      = { a => { b => 'baz' }, c => 'bar' };
+    $merged = { a => { b => 'baz', c => 'bar' } };    # Hashes merge
+
+    # Example 3:
+    $a      = { a => [ 1, 2, 3 ] };
+    $b      = { a => [] };
+    $merged = { a => [] };            # Non-hashes overwrite the other key
 
 =head1 ATTRIBUTES
 
@@ -221,19 +281,19 @@ Allows for passing variables to the config hash.
     );
 
 
-Param is initialized as a variable C<$p> inside the config file, so it could
-be accessed this way:
+Each key of the C<param> hash can be accessed via a function with the same name
+inside the config file:
 
     # app.conf
 
     {
         name => 'Rick James',
-        path => $p->{base_path} . 'rick/james'
+        path => base_path() . 'rick/james'
     };
 
 The evaluation of the config code is isolated from the rest of the code, so
 it doesn't have access to C<$self>. If you need to use C<$self>, you'll have
-to pass it in the C<params> hash and then reference it with C<$p-E<gt>{self}>
+to pass it in the C<params> hash and then reference it with C<self()>
 
 =head2 separator
 
