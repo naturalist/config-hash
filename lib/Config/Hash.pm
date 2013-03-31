@@ -19,13 +19,13 @@ sub new {
     my $self = bless \%args, $class;
 
     no strict 'refs';
-    if ( !*{"${class}::AUTOLOAD"}{CODE} ) {
-        *{"${class}::AUTOLOAD"} = sub {
-            our $AUTOLOAD;
-            my $sub = $AUTOLOAD =~ /::(\w+)$/ ? $1 : return;
-            return $self->{param}->{$sub};
-        };
-    }
+    no warnings 'redefine';
+    *{"${class}::AUTOLOAD"} = sub {
+        our $AUTOLOAD;
+        my $sub = $AUTOLOAD =~ /::(\w+)$/ ? $1 : return;
+        die "Param '$sub' not defined" unless exists $self->param->{$sub};
+        return $self->param->{$sub};
+    };
 
     if ( defined $self->{filename} ) {
 
@@ -53,9 +53,8 @@ sub new {
 }
 
 sub _eval {
-    my ( $param, $text ) = @_;
     local $@;
-    return (eval $text, $@);
+    return (eval shift, $@);
 }
 
 sub load {
@@ -71,9 +70,9 @@ sub load {
     my $text = do { local $/ = undef; <$in> };
     close($in);
 
-    my ( $hash, $error ) = _eval( $self->param, $text );
+    my ( $hash, $error ) = _eval( $text );
     die "Config file $filename parse error: " . $error if $error;
-    die "Config file $filename did not return a HASH"
+    die "Config file $filename did not return a HASH - $hash"
       unless ref $hash eq 'HASH';
 
     return $hash;
@@ -114,6 +113,8 @@ sub merge {
 }
 
 sub data  { $_[0]->{data} }
+sub param  { $_[0]->{param} }
+sub DESTROY {}
 
 1;
 
@@ -294,6 +295,9 @@ inside the config file:
 The evaluation of the config code is isolated from the rest of the code, so
 it doesn't have access to C<$self>. If you need to use C<$self>, you'll have
 to pass it in the C<params> hash and then reference it with C<self()>
+
+B<Note:> You will have to add C<()> to the function name, otherwise Perl will
+not recognize it as such and will die with an error.
 
 =head2 separator
 
