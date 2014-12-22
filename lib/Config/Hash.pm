@@ -6,7 +6,7 @@ use v5.06;
 
 use File::Basename;
 
-our $VERSION = '0.920';
+our $VERSION = '0.950';
 
 sub new {
     my ( $class, %args ) = @_;
@@ -17,15 +17,6 @@ sub new {
     $args{separator} ||= qr/\./;
 
     my $self = bless \%args, $class;
-
-    no strict 'refs';
-    no warnings 'redefine';
-    *{"${class}::AUTOLOAD"} = sub {
-        our $AUTOLOAD;
-        my $sub = $AUTOLOAD =~ /::(\w+)$/ ? $1 : return;
-        die "Param '$sub' not defined" unless exists $self->param->{$sub};
-        return $self->param->{$sub};
-    };
 
     if ( defined $self->{filename} ) {
 
@@ -70,7 +61,30 @@ sub load {
     my $text = do { local $/ = undef; <$in> };
     close($in);
 
-    my ( $hash, $error ) = _eval( $text );
+    my ( $hash, $error );
+    {
+        local $@;
+        my $module = $filename;
+        $module =~ s/\W/_/g;
+        my $locals = '';
+
+        for my $k ( keys %{ $self->param } ) {
+            $locals .=
+              "sub $k(); local *$k = sub { \$self->param->{'$k'} };";
+        }
+
+        my $code =
+            "package Config::Hash::Sandbox::$module;"
+          . "use strict;"
+          . "use warnings;"
+          . "sub include(\$); local *include = sub { \$self->load(\@_) };"
+          . $locals
+          . $text;
+
+        $hash  = eval $code;
+        $error = $@;
+    }
+
     die "Config file $filename parse error: " . $error if $error;
     die "Config file $filename did not return a HASH - $hash"
       unless ref $hash eq 'HASH';
@@ -95,21 +109,45 @@ sub get {
 }
 
 sub merge {
-    my ( $a, $b ) = @_;
+    my ( $a, $b, $sigil ) = @_;
+
     return $b
       if !ref($a)
       || !ref($b)
-      || ref($a) ne ref($b)
-      || ref($a) ne 'HASH';
+      || ref($a) ne ref($b);
 
-    for my $k ( keys %$b ) {
-        $a->{$k} =
-          exists $a->{$k}
-          ? merge( $a->{$k}, $b->{$k} )
-          : $b->{$k};
+    if ( ref $a eq 'ARRAY' ) {
+        return $b unless $sigil;
+        if ( $sigil eq '+' ) {
+            for my $e (@$b) {
+                push @$a, $e unless grep { eq_deeply( $_, $e ) } @$a;
+            }
+        }
+        else {
+            $a = [
+                grep {
+                    my $e = $_;
+                    !grep { eq_deeply( $_, $e ) } @$b
+                } @$a
+            ];
+        }
+        return $a;
     }
+    elsif ( ref $a eq 'HASH' ) {
+        for my $k ( keys %$b ) {
 
-    return $a;
+            # If the key is an array then look for a merge sigil
+            my $s = ref($b->{$k}) eq 'ARRAY' && $k =~ s/^(\+|\-)// ? $1 : '';
+
+            $a->{$k} =
+              exists $a->{$k}
+              ? merge( $a->{$k}, $b->{"$s$k"}, $s )
+              : $b->{$k};
+        }
+
+        return $a;
+    }
+    return $b;
 }
 
 sub data  { $_[0]->{data} }

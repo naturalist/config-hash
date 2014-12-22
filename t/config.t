@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 33;
+use Test::More;
 use Test::Deep;
 use Test::Exception;
 use Config::Hash;
@@ -71,10 +71,6 @@ dies_ok { Config::Hash->new( filename => "$Bin/bin/test_bad.conf" ) }
 dies_ok { Config::Hash->new( filename => "$Bin/bin/test_bad2.conf" ) }
 "Dies if no hash returned";
 
-# Using $self error
-dies_ok { Config::Hash->new( filename => "$Bin/bin/test_bad3.conf" ) }
-"Dies when \$self is referenced";
-
 # Try a missing param
 dies_ok { Config::Hash->new( filename => "$Bin/bin/test_bad4.conf" ) }
 "Dies when a missing param is used";
@@ -124,3 +120,5 @@ dies_ok { Config::Hash->new( filename => "$Bin/bin/test_bad4.conf" ) }
 # Load a missing file
 $SIG{__WARN__} = sub {};
 is_deeply $c->load('missing'), {};
+
+done_testing;
